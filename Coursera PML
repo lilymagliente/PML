@@ -1,0 +1,70 @@
+# clear environment
+rm(list=ls())
+
+# load packages 
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+
+Training = read.csv('http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv')
+Testing = read.csv('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv')
+
+# set seedt
+set.seed(123)
+
+in_Train = createDataPartition(y = Training$classe, p = 0.75, list = FALSE)
+
+Training_Data = Training[in_Train,]
+Testing_Data = Training[-in_Train,]
+dim(Training_Data)
+dim(Testing_Data)
+
+# random forests
+trainControlRF <- trainControl(method = "cv", number = 3, verboseIter=FALSE)
+modFitRandForest <- train(classe ~ ., data= Training_Data, method="rf",
+                          trControl=controlRF)
+modFitRandForest$finalModel
+
+# Get rid of first col
+Training_Data = Training_Data[-1]
+Testing_Data = Testing_Data[-1]
+dim(Training_Data)
+dim(Testing_Data)
+
+# remove columns if there is over 60% NA values 
+Training_Data = Training_Data[, -which(colMeans(is.na(Training_Data)) > 0.6)]
+dim(Training_Data)
+
+Testing_Data = Testing_Data[, -which(colMeans(is.na(Testing_Data)) > 0.6)]
+dim(Testing_Data)
+
+# get rid of variables with zero variance 
+NearZeroVar = nearZeroVar(Training_Data)
+Training_Data = Training_Data[,-NearZeroVar]
+Testing_Data = Testing_Data[,-NearZeroVar]
+dim(Training_Data)
+dim(Testing_Data)
+
+# decision trees
+set.seed(123)
+Tree <- rpart(classe ~ ., data = Training_Data, method="class")
+fancyRpartPlot(Tree)
+
+# random forests
+modFitRF <- randomForest(classe ~ ., data=Training_Data)
+predictionRF <- predict(modFitRF, Training_Data, type = "class")
+cmrf <- confusionMatrix(predictionRF, Training_Data$classe) 
+predictionRF <- predict(modFitRF, Testing_Data, type = "class")
+predictionRF
+
+# gbm
+GBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+modFitGBM  <- train(classe ~ ., data=Training_Data, method = "gbm", trControl = GBM, verbose = FALSE)
+modFitGBM$finalModel
+
+# gbm prediction on Test dataset 
+predictGBM <- predict(modFitGBM, newdata=TestSet)
+confMatGBM <- confusionMatrix(predictGBM, TestSet$classe)
+confMatGBM
